@@ -30,7 +30,7 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: ti777777/claude-code-action@main
         with:
           # Select the Gitea provider.
           provider: gitea

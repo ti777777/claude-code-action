@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: anthropics/claude-code-action@v1
+      - uses: ti777777/claude-code-action@main
         with:
           provider: gitea
           # Gitea has no Anthropic GitHub App, so a token is required. The
