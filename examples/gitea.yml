@@ -1,0 +1,52 @@
+# Example workflow for running Claude Code Action against a Gitea instance.
+# Place this at .gitea/workflows/claude.yml in your Gitea repository.
+#
+# Gitea Actions is GitHub-Actions compatible: it injects GITHUB_SERVER_URL /
+# GITHUB_API_URL / GITHUB_TOKEN pointing at your Gitea instance, so the action
+# can auto-detect the endpoints. Set `gitea_url` / `gitea_api_url` explicitly
+# only if you run this from a different runner than the Gitea instance.
+name: Claude Code (Gitea)
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Select the Gitea provider.
+          provider: gitea
+
+          # Gitea has no Anthropic GitHub App, so a token is required and is
+          # reused as the Gitea access token. The Gitea Actions run token or a
+          # personal access token both work.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Claude API auth (unchanged from the GitHub setup).
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Optional: point at a specific Gitea instance when not running on it.
+          # gitea_url: https://gitea.example.com
+          # gitea_api_url: https://gitea.example.com/api/v1
+
+          # Optional: enable the general-purpose Gitea API MCP server.
+          # claude_args: |
+          #   --allowedTools "mcp__gitea__get_issue,mcp__gitea__get_file_contents"

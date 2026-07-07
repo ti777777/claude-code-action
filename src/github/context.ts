@@ -9,6 +9,8 @@ import type {
   WorkflowRunEvent,
 } from "@octokit/webhooks-types";
 import { CLAUDE_APP_BOT_ID, CLAUDE_BOT_LOGIN } from "./constants";
+import { getProviderName } from "../providers/config";
+import type { ProviderName } from "../providers/types";
 // Custom types for GitHub Actions events that aren't webhooks
 export type WorkflowDispatchEvent = {
   action?: never;
@@ -83,6 +85,9 @@ type BaseContext = {
   };
   actor: string;
   inputs: {
+    // Optional in the type so inline test fixtures need not set it;
+    // parseGitHubContext always populates it (defaulting to "github").
+    provider?: ProviderName;
     prompt: string;
     triggerPhrase: string;
     assigneeTrigger: string;
@@ -145,6 +150,7 @@ export function parseGitHubContext(): GitHubContext {
     },
     actor: context.actor,
     inputs: {
+      provider: getProviderName(),
       prompt: process.env.PROMPT || "",
       triggerPhrase: process.env.TRIGGER_PHRASE ?? "@claude",
       assigneeTrigger: process.env.ASSIGNEE_TRIGGER ?? "",
