@@ -21,7 +21,9 @@ Single entrypoint: `src/entrypoints/run.ts` orchestrates everything — prepare 
 
 ## Key Concepts
 
-**Auth priority**: `github_token` input (user-provided) > GitHub App OIDC token (default). The `claude_code_oauth_token` and `anthropic_api_key` are for the Claude API, not GitHub. Token setup lives in `src/github/token.ts`.
+**Provider abstraction (GitHub vs Gitea)**: The git remote server is pluggable via the `provider` input (`github` | `gitea`). `src/providers/` defines the `GitProvider` interface and a `getProvider(context)` factory. `run.ts` only touches the provider through four seam methods: `setupToken`, `checkWritePermissions`, `prepare`, and `updateTrackingComment`. The GitHub implementation (`src/providers/github/`) is a thin delegation to the original code paths (zero behavior change). The Gitea implementation (`src/providers/gitea/`) talks to Gitea's REST `/api/v1` (no GraphQL) and ships its own MCP servers (`src/mcp/gitea-*.ts`). Gitea MCP servers are registered under the **same server keys** (`github_comment`, `github_file_ops`) so the shared prompt/tool names stay valid across platforms — only the script behind each key differs.
+
+**Auth priority**: `github_token` input (user-provided) > GitHub App OIDC token (default). The `claude_code_oauth_token` and `anthropic_api_key` are for the Claude API, not GitHub. Token setup lives in `src/github/token.ts`. For `provider: gitea` there is no App exchange — the token comes straight from `github_token` (or the Gitea Actions run token) via `GiteaProvider.setupToken`.
 
 **Mode lifecycle**: `detectMode()` in `src/modes/detector.ts` picks the mode name ("tag" or "agent"). Trigger checking and prepare dispatch are inlined in `run.ts`: tag mode calls `prepareTagMode()` from `src/modes/tag/`, agent mode calls `prepareAgentMode()` from `src/modes/agent/`.
 

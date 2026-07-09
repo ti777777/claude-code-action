@@ -13,6 +13,7 @@ import type {
 import { CLAUDE_APP_BOT_ID, CLAUDE_BOT_LOGIN } from "../src/github/constants";
 
 const defaultInputs = {
+  provider: "github" as const,
   prompt: "",
   triggerPhrase: "/claude",
   assigneeTrigger: "",

@@ -5,6 +5,18 @@ branding:
   color: "orange"
 
 inputs:
+  provider:
+    description: "Git remote server provider: 'github' (default) or 'gitea'. Selects which platform the action integrates with for comments, branches, and MCP servers."
+    required: false
+    default: "github"
+  gitea_url:
+    description: "Base URL of the Gitea instance (e.g. https://gitea.example.com). Only used when provider is 'gitea'. Defaults to the GITHUB_SERVER_URL that Gitea Actions injects."
+    required: false
+    default: ""
+  gitea_api_url:
+    description: "REST API base URL of the Gitea instance (e.g. https://gitea.example.com/api/v1). Only used when provider is 'gitea'. Defaults to '<gitea_url>/api/v1'."
+    required: false
+    default: ""
   trigger_phrase:
     description: "The trigger phrase to look for in comments or issue body"
     required: false
@@ -277,6 +289,10 @@ runs:
       env:
         # Prepare inputs
         MODE: ${{ inputs.mode }}
+        # Git remote server provider selection (github | gitea)
+        PROVIDER: ${{ inputs.provider }}
+        GITEA_SERVER_URL: ${{ inputs.gitea_url }}
+        GITEA_API_URL: ${{ inputs.gitea_api_url }}
         PROMPT: ${{ inputs.prompt }}
         TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}
         ASSIGNEE_TRIGGER: ${{ inputs.assignee_trigger }}

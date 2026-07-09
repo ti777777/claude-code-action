@@ -1,5 +1,55 @@
 # Advanced Configuration
 
+## Git Remote Provider (GitHub or Gitea)
+
+By default the action integrates with GitHub. Set the `provider` input to `gitea`
+to run the same action against a [Gitea](https://about.gitea.com/) instance
+instead. The provider selection controls every platform-specific operation:
+fetching issue/PR data, creating and updating the tracking comment, setting up
+branches, configuring the git remote, and which MCP servers Claude gets
+(`gitea-comment-server`, `gitea-file-ops-server`, and the general-purpose
+`gitea-server`, all talking to Gitea's REST API).
+
+### Example: running on Gitea Actions
+
+```yaml
+# .gitea/workflows/claude.yml
+name: Claude
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ti777777/claude-code-action@main
+        with:
+          provider: gitea
+          # Gitea has no Anthropic GitHub App, so a token is required. The
+          # Gitea Actions run token (secrets.GITHUB_TOKEN / GITEA_TOKEN) or a
+          # personal access token both work. It is reused as the platform token.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+### Provider inputs
+
+| Input           | Description                                                                                          | Default                                       |
+| --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `provider`      | Git remote server type: `github` or `gitea`.                                                         | `github`                                      |
+| `gitea_url`     | Base URL of the Gitea instance (e.g. `https://gitea.example.com`). Only used when `provider: gitea`. | `GITHUB_SERVER_URL` injected by Gitea Actions |
+| `gitea_api_url` | REST API base URL (e.g. `https://gitea.example.com/api/v1`). Only used when `provider: gitea`.       | `<gitea_url>/api/v1`                          |
+
+When the action runs **on** Gitea Actions, `gitea_url` / `gitea_api_url` can be
+omitted — Gitea's runner injects `GITHUB_SERVER_URL` (and `GITHUB_API_URL`)
+pointing at the instance, which the action derives the endpoints from. Set them
+explicitly only when driving a Gitea instance from a different runner.
+
+**Notes for Gitea:** the tracking comment is always a regular issue/PR comment,
+and the CI-status and inline-review MCP servers are GitHub-only for now. The
+general Gitea API server is opt-in via `mcp__gitea__*` in `--allowedTools`.
+
 ## Using Custom MCP Configuration
 
 You can add custom MCP (Model Context Protocol) servers to extend Claude's capabilities using the `--mcp-config` flag in `claude_args`. These servers merge with the built-in GitHub MCP servers.

@@ -11,10 +11,7 @@ import { dirname } from "path";
 import { spawn } from "child_process";
 import { appendFile } from "fs/promises";
 import { existsSync, readFileSync } from "fs";
-import { setupGitHubToken, WorkflowValidationSkipError } from "../github/token";
-import { checkWritePermissions } from "../github/validation/permissions";
-import { createOctokit } from "../github/api/client";
-import type { Octokits } from "../github/api/client";
+import { WorkflowValidationSkipError } from "../github/token";
 import {
   parseGitHubContext,
   isEntityContext,
@@ -24,13 +21,12 @@ import {
 } from "../github/context";
 import type { GitHubContext } from "../github/context";
 import { detectMode } from "../modes/detector";
-import { prepareTagMode } from "../modes/tag";
-import { prepareAgentMode } from "../modes/agent";
+import { getProvider } from "../providers";
+import type { GitProvider } from "../providers";
 import { checkContainsTrigger } from "../github/validation/trigger";
 import { restoreConfigFromBase } from "../github/operations/restore-config";
 import { validateBranchName } from "../github/operations/branch";
 import { collectActionInputsPresence } from "./collect-inputs";
-import { updateCommentLink } from "./update-comment-link";
 import { formatTurnsFromData } from "./format-turns";
 import type { Turn } from "./format-turns";
 // Base-action imports (used directly instead of subprocess)
@@ -155,7 +151,7 @@ async function run() {
   let prepareSuccess = true;
   let prepareError: string | undefined;
   let context: GitHubContext | undefined;
-  let octokit: Octokits | undefined;
+  let provider: GitProvider | undefined;
   let workloadIdentity: WorkloadIdentityHandle | undefined;
   // Track whether we've completed prepare phase, so we can attribute errors correctly
   let prepareCompleted = false;
@@ -164,12 +160,13 @@ async function run() {
     const actionInputsPresent = collectActionInputsPresence();
     context = parseGitHubContext();
     const modeName = detectMode(context);
+    provider = getProvider(context);
     console.log(
-      `Auto-detected mode: ${modeName} for event: ${context.eventName}`,
+      `Auto-detected mode: ${modeName} for event: ${context.eventName} (provider: ${provider.name})`,
     );
 
     try {
-      githubToken = await setupGitHubToken();
+      githubToken = await provider.setupToken();
     } catch (error) {
       if (error instanceof WorkflowValidationSkipError) {
         core.setOutput("skipped_due_to_workflow_validation_mismatch", "true");
@@ -179,19 +176,15 @@ async function run() {
       throw error;
     }
 
-    octokit = createOctokit(githubToken);
-
     // Set GITHUB_TOKEN and GH_TOKEN in process env for downstream usage
     process.env.GITHUB_TOKEN = githubToken;
     process.env.GH_TOKEN = githubToken;
 
     // Check write permissions (only for entity contexts)
     if (isEntityContext(context)) {
-      const hasWritePermissions = await checkWritePermissions(
-        octokit.rest,
+      const hasWritePermissions = await provider.checkWritePermissions(
+        githubToken,
         context,
-        context.inputs.allowedNonWriteUsers,
-        !!process.env.OVERRIDE_GITHUB_TOKEN,
       );
       if (!hasWritePermissions) {
         throw new Error(
@@ -219,10 +212,11 @@ async function run() {
     console.log(
       `Preparing with mode: ${modeName} for event: ${context.eventName}`,
     );
-    const prepareResult =
-      modeName === "tag"
-        ? await prepareTagMode({ context, octokit, githubToken })
-        : await prepareAgentMode({ context, octokit, githubToken });
+    const prepareResult = await provider.prepare({
+      mode: modeName,
+      context,
+      token: githubToken,
+    });
 
     commentId = prepareResult.commentId;
     claudeBranch = prepareResult.branchInfo.claudeBranch;
@@ -327,17 +321,16 @@ async function run() {
       context &&
       isEntityContext(context) &&
       githubToken &&
-      octokit
+      provider
     ) {
       try {
-        await updateCommentLink({
+        await provider.updateTrackingComment({
           commentId,
           githubToken,
           claudeBranch,
           baseBranch: baseBranch || context.repository.default_branch || "main",
           triggerUsername: context.actor,
           context,
-          octokit,
           claudeSuccess,
           outputFile: executionFile,
           prepareSuccess,
